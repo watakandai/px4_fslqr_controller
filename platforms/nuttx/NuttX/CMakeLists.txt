@@ -109,7 +109,7 @@ add_custom_command(OUTPUT ${NUTTX_DIR}/include/nuttx/version.h ${NUTTX_DIR}/incl
 add_custom_target(nuttx_context DEPENDS ${NUTTX_DIR}/include/nuttx/version.h)
 
 # library of NuttX libraries
-add_library(nuttx_build INTERFACE)
+add_library(nuttx_build SHARED IMPORTED GLOBAL) 
 add_dependencies(nuttx_build nuttx_context)
 
 # builtins

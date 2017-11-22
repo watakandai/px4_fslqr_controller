@@ -7,7 +7,7 @@ extern orb_advert_t mavlink_log_pub;
 // required number of samples for sensor
 // to initialize
 static const uint32_t		REQ_MOCAP_INIT_COUNT = 20;
-static const uint32_t		MOCAP_TIMEOUT = 200000;	// 0.2 s
+static const uint32_t		MOCAP_TIMEOUT = 2000000;	// 0.2 s
 
 void BlockLocalPositionEstimator::mocapInit()
 {
@@ -97,13 +97,13 @@ void BlockLocalPositionEstimator::mocapCorrect()
 
 	if (beta > BETA_TABLE[n_y_mocap]) {
 		if (!(_sensorFault & SENSOR_MOCAP)) {
-			//mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap fault, beta %5.2f", double(beta));
+			mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap fault, beta %5.2f", double(beta));
 			_sensorFault |= SENSOR_MOCAP;
 		}
 
 	} else if (_sensorFault & SENSOR_MOCAP) {
 		_sensorFault &= ~SENSOR_MOCAP;
-		//mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap OK");
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap OK");
 	}
 
 	// kalman filter correction always
@@ -119,7 +119,7 @@ void BlockLocalPositionEstimator::mocapCheckTimeout()
 		if (!(_sensorTimeout & SENSOR_MOCAP)) {
 			_sensorTimeout |= SENSOR_MOCAP;
 			_mocapStats.reset();
-			mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap timeout ");
+			mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap timeout: %05u [ms]", (_timeStamp-_time_last_mocap)/1000);
 		}
 	}
 }

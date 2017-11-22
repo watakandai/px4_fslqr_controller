@@ -596,7 +596,7 @@ PARAM_DEFINE_FLOAT(COM_ARM_IMU_GYR, 0.25f);
  * @group Commander
  * @unit Gauss
  * @min 0.05
- * @max 0.5
+ * @max 1.0
  * @decimal 2
  * @increment 0.05
  */
