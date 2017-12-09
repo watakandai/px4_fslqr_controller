@@ -214,7 +214,10 @@ void BlockLocalPositionEstimator::update()
 	uint64_t newTimeStamp = hrt_absolute_time();
 	float dt = (newTimeStamp - _timeStamp) / 1.0e6f;
 	_timeStamp = newTimeStamp;
-
+	if(_timeStamp - _time_frequency > 1000000){
+		// mavlink_log_info(&mavlink_log_pub, "[lpe] Frequency: %03o [Hz]", int(1/dt));
+		_time_frequency = _timeStamp;
+	}
 	// set dt for all child blocks
 	setDt(dt);
 

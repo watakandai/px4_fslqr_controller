@@ -47,6 +47,10 @@ int BlockLocalPositionEstimator::mocapMeasure(Vector<float, n_y_mocap> &y)
 	y(Y_mocap_z) = _sub_mocap.get().z;
 	_mocapStats.update(y);
 	_time_last_mocap = _sub_mocap.get().timestamp;
+	if(_timeStamp - _time_frequency > 900000){
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe][mocap] Frequency: %05o [Hz]", (int)(1000*1000/(_timeStamp-_time_last_mocap)));
+		// mavlink_and_console_log_info(&mavlink_log_pub, "[lpe][mocap] X,Y,Z: %2.5f, %2.5f, %2.5f", (double)y(Y_mocap_x), (double)y(Y_mocap_y), (double)y(Y_mocap_z));
+	}
 	return OK;
 }
 
@@ -119,7 +123,7 @@ void BlockLocalPositionEstimator::mocapCheckTimeout()
 		if (!(_sensorTimeout & SENSOR_MOCAP)) {
 			_sensorTimeout |= SENSOR_MOCAP;
 			_mocapStats.reset();
-			mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap timeout: %05u [ms]", (_timeStamp-_time_last_mocap)/1000);
+			mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap timeout: %05o [us]", int(_timeStamp-_time_last_mocap));
 		}
 	}
 }

@@ -49,12 +49,14 @@
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
 #include <systemlib/perf_counter.h>
+#include <systemlib/mavlink_log.h>
 #include <uORB/topics/att_pos_mocap.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_global_position.h>
 
+extern orb_advert_t mavlink_log_pub;
 extern "C" __EXPORT int attitude_estimator_q_main(int argc, char *argv[]);
 
 using math::Vector;
@@ -312,6 +314,7 @@ void AttitudeEstimatorQ::task_main()
 				_mag(0) = sensors.magnetometer_ga[0];
 				_mag(1) = sensors.magnetometer_ga[1];
 				_mag(2) = sensors.magnetometer_ga[2];
+				// mavlink_and_console_log_info(&mavlink_log_pub, "Mag Hdg %2.4f, %2.4f, %2.4f", (double)_mag(0), (double)_mag(1), (double)_mag(2));
 
 				if (_mag.length() < 0.01f) {
 					PX4_ERR("WARNING: degenerate mag!");
@@ -356,6 +359,9 @@ void AttitudeEstimatorQ::task_main()
 
 			if (orb_copy(ORB_ID(att_pos_mocap), _mocap_sub, &mocap) == PX4_OK) {
 				math::Quaternion q(mocap.q);
+				// mavlink_and_console_log_info(&mavlink_log_pub, "Mocap Quat: %2.2f, %2.2f, %2.2f, %2.2f", double(q.data[0]), double(q.data[1]), double(q.data[2]), double(q.data[3]));
+				// local -> q = WORLD;
+				// local -> Rmos = WORLD;
 				math::Matrix<3, 3> Rmoc = q.to_dcm();
 
 				math::Vector<3> v(1.0f, 0.0f, 0.4f);
@@ -364,6 +370,7 @@ void AttitudeEstimatorQ::task_main()
 				// Hence Rmoc must be transposed having (Rwr)' * Vw
 				// Rrw * Vw = vn. This way we have consistency
 				_mocap_hdg = Rmoc.transposed() * v;
+				// mavlink_and_console_log_info(&mavlink_log_pub, "mocap_hdg %2.4f, %2.4f, %2.4f", (double)_mocap_hdg(0), (double)_mocap_hdg(1), (double)_mocap_hdg(2));
 
 				// Motion Capture external heading usage (ATT_EXT_HDG_M 2)
 				if (_ext_hdg_mode == 2) {

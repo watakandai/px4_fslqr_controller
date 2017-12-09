@@ -144,6 +144,7 @@ transition_result_t arming_state_transition(vehicle_status_s *status,
 
 	} else {
 
+	mavlink_log_info(mavlink_log_pub, "----1");
 		/*
 		 * Get sensing state if necessary
 		 */
@@ -160,8 +161,7 @@ transition_result_t arming_state_transition(vehicle_status_s *status,
 
 		/* re-run the pre-flight check as long as sensors are failing */
 		if (!status_flags->condition_system_sensors_initialized
-		    && (new_arming_state == vehicle_status_s::ARMING_STATE_ARMED
-			|| new_arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
+		    && (new_arming_state == vehicle_status_s::ARMING_STATE_ARMED || new_arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
 		    && status->hil_state == vehicle_status_s::HIL_STATE_OFF) {
 
 			if (last_preflight_check == 0 || hrt_absolute_time() - last_preflight_check > 1000 * 1000) {
@@ -202,6 +202,7 @@ transition_result_t arming_state_transition(vehicle_status_s *status,
 		// Check that we have a valid state transition
 		bool valid_transition = arming_transitions[new_arming_state][status->arming_state];
 
+		mavlink_log_info(mavlink_log_pub, "----valid?");
 		if (valid_transition) {
 			// We have a good transition. Now perform any secondary validation.
 			if (new_arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
@@ -378,6 +379,7 @@ main_state_transition(struct vehicle_status_s *status, main_state_t new_main_sta
 		      status_flags_s *status_flags, struct commander_state_s *internal_state)
 {
 	transition_result_t ret = TRANSITION_DENIED;
+	// mavlink_and_console_log_info(&mavlink_log_pub, "main_state_transition: %i", new_main_state);
 
 	/* transition may be denied even if the same state is requested because conditions may have changed */
 	switch (new_main_state) {
@@ -590,6 +592,8 @@ bool set_nav_state(struct vehicle_status_s *status,
 	reset_link_loss_globals(armed, old_failsafe, rc_loss_act);
 	reset_link_loss_globals(armed, old_failsafe, data_link_loss_act);
 
+	// mavlink_and_console_log_info(mavlink_log_pub, "set nav state");
+	mavlink_and_console_log_info(mavlink_log_pub, "state: %i", internal_state->main_state);
 	/* evaluate main state to decide in normal (non-failsafe) mode */
 	switch (internal_state->main_state) {
 	case commander_state_s::MAIN_STATE_ACRO:
@@ -600,6 +604,7 @@ bool set_nav_state(struct vehicle_status_s *status,
 
 		/* require RC for all manual modes */
 		if (rc_lost && is_armed) {
+			mavlink_log_info(mavlink_log_pub, "rc_lost->failsafe");
 			enable_failsafe(status, old_failsafe, mavlink_log_pub, reason_no_rc);
 
 			set_rc_loss_nav_state(status, armed, status_flags, internal_state, rc_loss_act);
@@ -840,9 +845,11 @@ bool set_nav_state(struct vehicle_status_s *status,
 
 	case commander_state_s::MAIN_STATE_OFFBOARD:
 
+	mavlink_and_console_log_info(mavlink_log_pub, "set_nav_state state: OFFBOARD");
 		/* require offboard control, otherwise stay where you are */
 		if (status_flags->offboard_control_signal_lost && !status->rc_signal_lost) {
 			enable_failsafe(status, old_failsafe, mavlink_log_pub, reason_no_offboard);
+			mavlink_log_info(mavlink_log_pub, "offboard_control_signal_lost");
 
 			if (status_flags->offboard_control_loss_timeout && offb_loss_rc_act < 6 && offb_loss_rc_act >= 0) {
 				if (offb_loss_rc_act == 3 && status_flags->condition_global_position_valid
@@ -853,6 +860,8 @@ bool set_nav_state(struct vehicle_status_s *status,
 					status->nav_state = vehicle_status_s::NAVIGATION_STATE_POSCTL;
 
 				} else if (offb_loss_rc_act == 1 && status_flags->condition_local_altitude_valid) {
+					mavlink_and_console_log_info(mavlink_log_pub, "OFFB->ALTCTL: [timeout]");
+					mavlink_and_console_log_info(mavlink_log_pub, "OFFB->ALTCTL: [rc_act]:1, [altvalid]");
 					status->nav_state = vehicle_status_s::NAVIGATION_STATE_ALTCTL;
 
 				} else if (offb_loss_rc_act == 2) {
@@ -882,6 +891,10 @@ bool set_nav_state(struct vehicle_status_s *status,
 					status->nav_state = vehicle_status_s::NAVIGATION_STATE_POSCTL;
 
 				} else if (status_flags->condition_local_altitude_valid) {
+
+					mavlink_and_console_log_info(mavlink_log_pub, "OFFB->ALTCTL: [timeout]%i", status_flags->offboard_control_loss_timeout);
+					mavlink_and_console_log_info(mavlink_log_pub, "OFFB->ALTCTL: [rc_act]%i", offb_loss_rc_act);
+					mavlink_and_console_log_info(mavlink_log_pub, "OFFB->ALTCTL: [altvalid]");
 					status->nav_state = vehicle_status_s::NAVIGATION_STATE_ALTCTL;
 
 				} else {

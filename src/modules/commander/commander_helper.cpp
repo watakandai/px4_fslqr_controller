@@ -58,6 +58,7 @@
 #include <uORB/topics/led_control.h>
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
+#include <systemlib/mavlink_log.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_tone_alarm.h>
 
@@ -81,6 +82,8 @@ using namespace DriverFramework;
 #define VEHICLE_TYPE_VTOL_RESERVED5 25
 
 #define BLINK_MSG_TIME	700000	// 3 fast blinks (in us)
+
+extern orb_advert_t mavlink_log_pub;
 
 bool is_multirotor(const struct vehicle_status_s *current_status)
 {
@@ -148,6 +151,7 @@ void set_tune_override(int tune)
 
 void set_tune(int tune)
 {
+	// mavlink_and_console_log_info(&mavlink_log_pub, "Tune: %03i", tune);
 	unsigned int new_tune_duration = tune_durations[tune];
 
 	/* don't interrupt currently playing non-repeating tune by repeating */
@@ -243,6 +247,7 @@ void tune_failsafe(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_PURPLE, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
+		mavlink_and_console_log_info(&mavlink_log_pub, "FAILSAFE Buzz: %i", led_control_s::COLOR_PURPLE);
 		set_tune(TONE_BATTERY_WARNING_FAST_TUNE);
 	}
 }

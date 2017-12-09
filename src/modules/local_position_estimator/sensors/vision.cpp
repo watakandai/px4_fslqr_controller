@@ -61,6 +61,10 @@ int BlockLocalPositionEstimator::visionMeasure(Vector<float, n_y_vision> &y)
 	y(Y_vision_z) = _sub_vision_pos.get().z;
 	_visionStats.update(y);
 	_time_last_vision_p = _sub_vision_pos.get().timestamp;
+	if(_timeStamp - _time_frequency > 900000){
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe][vision] Frequency: %05o [Hz]", (int)(1000*1000/(_timeStamp-_time_last_vision_p)));
+		// mavlink_and_console_log_info(&mavlink_log_pub, "[lpe][vision] X,Y,Z: %2.5f, %2.5f, %2.5f", (double)y(Y_vision_x), (double)y(Y_vision_y), (double)y(Y_vision_z));
+	}
 	return OK;
 }
 

@@ -1547,6 +1547,8 @@ MulticopterPositionControl::control_offboard(float dt)
 			/* control position */
 			_pos_sp(0) = _pos_sp_triplet.current.x;
 			_pos_sp(1) = _pos_sp_triplet.current.y;
+			// mavlink_and_console_log_info(&_mavlink_log_pub, "SP.x %2.4f", (double)_pos_sp(0));
+			// mavlink_and_console_log_info(&_mavlink_log_pub, "SP.y %2.4f", (double)_pos_sp(1));
 			_run_pos_control = true;
 
 			_hold_offboard_xy = false;
@@ -1593,6 +1595,7 @@ MulticopterPositionControl::control_offboard(float dt)
 
 		if (_control_mode.flag_control_altitude_enabled && _pos_sp_triplet.current.alt_valid) {
 			/* control altitude as it is enabled */
+			// mavlink_and_console_log_info(&_mavlink_log_pub, "SP.z %2.4f", (double)_pos_sp(2));
 			_pos_sp(2) = _pos_sp_triplet.current.z;
 			_run_alt_control = true;
 

@@ -361,6 +361,7 @@ private:
 	uint64_t _time_last_vision_p;
 	uint64_t _time_last_mocap;
 	uint64_t _time_last_land;
+	uint64_t _time_frequency;
 
 	// reference altitudes
 	float _altOrigin;

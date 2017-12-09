@@ -91,6 +91,8 @@
 #include "mavlink_command_sender.h"
 
 static const float mg2ms2 = CONSTANTS_ONE_G / 1000.0f;
+static orb_advert_t mavlink_log_pub = nullptr;
+
 
 MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_mavlink(parent),
@@ -434,6 +436,7 @@ MavlinkReceiver::send_flight_information()
 
 	actuator_armed_s actuator_armed;
 	int ret = orb_copy(ORB_ID(actuator_armed), _actuator_armed_sub, &actuator_armed);
+	mavlink_log_info(&mavlink_log_pub, "actuator_armed at: %i", actuator_armed.armed_time_ms);
 
 	if (ret == 0 && actuator_armed.timestamp != 0) {
 		flight_info.arming_time_utc = flight_info.takeoff_time_utc = actuator_armed.armed_time_ms;

@@ -147,7 +147,7 @@ static constexpr uint8_t COMMANDER_MAX_GPS_NOISE = 60;		/**< Maximum percentage 
 
 #define POSITION_TIMEOUT		1			/**< default number of seconds of position health check failure required to declare the position invalid */
 #define FAILSAFE_DEFAULT_TIMEOUT	(3 * 1000 * 1000)	/**< hysteresis time - the failsafe will trigger after 3 seconds in this state */
-#define OFFBOARD_TIMEOUT		500000
+#define OFFBOARD_TIMEOUT		2000000
 #define DIFFPRESS_TIMEOUT		2000000
 
 #define HOTPLUG_SENS_TIMEOUT		(8 * 1000 * 1000)	/**< wait for hotplug sensors to come online for upto 8 seconds */
@@ -724,6 +724,7 @@ transition_result_t arm_disarm(bool arm, orb_advert_t *mavlink_log_pub_local, co
 
 	// Transition the armed state. By passing mavlink_log_pub to arming_state_transition it will
 	// output appropriate error messages if the state cannot transition.
+	mavlink_log_info(mavlink_log_pub_local, "arm_disarm");
 	arming_res = arming_state_transition(&status,
 					     &battery,
 					     &safety,
@@ -1915,8 +1916,7 @@ int commander_thread_main(int argc, char *argv[])
 			orb_copy(ORB_ID(offboard_control_mode), offboard_control_mode_sub, &offboard_control_mode);
 		}
 
-		if (offboard_control_mode.timestamp != 0 &&
-		    offboard_control_mode.timestamp + OFFBOARD_TIMEOUT > hrt_absolute_time()) {
+		if (offboard_control_mode.timestamp != 0 && offboard_control_mode.timestamp + OFFBOARD_TIMEOUT > hrt_absolute_time()) {
 			if (status_flags.offboard_control_signal_lost) {
 				status_flags.offboard_control_signal_lost = false;
 				status_flags.offboard_control_loss_timeout = false;
@@ -1925,6 +1925,7 @@ int commander_thread_main(int argc, char *argv[])
 
 		} else {
 			if (!status_flags.offboard_control_signal_lost) {
+				mavlink_and_console_log_info(&mavlink_log_pub, "Offb SigLost");
 				status_flags.offboard_control_signal_lost = true;
 				status_changed = true;
 			}
@@ -1934,11 +1935,13 @@ int commander_thread_main(int argc, char *argv[])
 				if (offboard_loss_timeout < FLT_EPSILON) {
 					/* execute loss action immediately */
 					status_flags.offboard_control_loss_timeout = true;
+					mavlink_and_console_log_info(&mavlink_log_pub, "Offb Timeout FLT");
 
 				} else {
 					/* wait for timeout if set */
 					status_flags.offboard_control_loss_timeout = offboard_control_mode.timestamp +
 						OFFBOARD_TIMEOUT + offboard_loss_timeout * 1e6f < hrt_absolute_time();
+						mavlink_and_console_log_info(&mavlink_log_pub, "Offboard Wait4Timeout");
 				}
 
 				if (status_flags.offboard_control_loss_timeout) {
@@ -1960,7 +1963,7 @@ int commander_thread_main(int argc, char *argv[])
 				orb_copy(ORB_ID(telemetry_status), telemetry_subs[i], &telemetry);
 
 				/* perform system checks when new telemetry link connected */
-				if (/* we first connect a link or re-connect a link after loosing it or haven't yet reported anything */
+					if (/* we first connect a link or re-connect a link after loosing it or haven't yet reported anything */
 				    (telemetry_last_heartbeat[i] == 0 || (hrt_elapsed_time(&telemetry_last_heartbeat[i]) > 3 * 1000 * 1000)
 				        || !telemetry_preflight_checks_reported[i]) &&
 				    /* and this link has a communication partner */
@@ -2090,6 +2093,7 @@ int commander_thread_main(int argc, char *argv[])
 				arming_state_t new_arming_state = (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED ? vehicle_status_s::ARMING_STATE_STANDBY :
 								   vehicle_status_s::ARMING_STATE_STANDBY_ERROR);
 
+				mavlink_log_info(&mavlink_log_pub, "arming within thread");
 				if (TRANSITION_CHANGED == arming_state_transition(&status,
 										  &battery,
 										  &safety,
@@ -2177,6 +2181,8 @@ int commander_thread_main(int argc, char *argv[])
 			if (run_quality_checks) {
 				check_posvel_validity(local_position.xy_valid, local_position.eph, eph_threshold, local_position.timestamp, &last_lpos_fail_time_us, &lpos_probation_time_us, &status_flags.condition_local_position_valid, &status_changed);
 				check_posvel_validity(local_position.v_xy_valid, local_position.evh, evh_threshold, local_position.timestamp, &last_lvel_fail_time_us, &lvel_probation_time_us, &status_flags.condition_local_velocity_valid, &status_changed);
+				// mavlink_and_console_log_info(&mavlink_log_pub, "lpos valid: %i", status_flags.condition_local_position_valid);
+				// mavlink_and_console_log_info(&mavlink_log_pub, "lvel valid: %i", status_flags.condition_local_velocity_valid);
 			}
 		}
 
@@ -2400,6 +2406,7 @@ int commander_thread_main(int argc, char *argv[])
 
 		/* If in INIT state, try to proceed to STANDBY state */
 		if (!status_flags.condition_calibration_enabled && status.arming_state == vehicle_status_s::ARMING_STATE_INIT) {
+			mavlink_log_info(&mavlink_log_pub, "init to standby");
 			arming_ret = arming_state_transition(&status,
 							     &battery,
 							     &safety,
@@ -2692,6 +2699,7 @@ int commander_thread_main(int argc, char *argv[])
 
 				} else if ((stick_off_counter == rc_arm_hyst && stick_on_counter < rc_arm_hyst) || arm_switch_to_disarm_transition) {
 					/* disarm to STANDBY if ARMED or to STANDBY_ERROR if ARMED_ERROR */
+					mavlink_log_info(&mavlink_log_pub, "armed to disarmed");
 					arming_state_t new_arming_state = (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED ? vehicle_status_s::ARMING_STATE_STANDBY :
 									   vehicle_status_s::ARMING_STATE_STANDBY_ERROR);
 					arming_ret = arming_state_transition(&status,
@@ -2744,6 +2752,7 @@ int commander_thread_main(int argc, char *argv[])
 						print_reject_arm("NOT ARMING: Geofence RTL requires valid home");
 
 					} else if (status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
+						mavlink_log_info(&mavlink_log_pub, "arm_switch_to_arm");
 						arming_ret = arming_state_transition(&status,
 										     &battery,
 										     &safety,
@@ -3990,7 +3999,8 @@ set_control_mode()
 		control_mode.flag_control_manual_enabled = false;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_offboard_enabled = true;
-
+		mavlink_and_console_log_info(&mavlink_log_pub, "set_control_mode");
+		mavlink_and_console_log_info(&mavlink_log_pub, "ignore_position %i", offboard_control_mode.ignore_position);
 		/*
 		 * The control flags depend on what is ignored according to the offboard control mode topic
 		 * Inner loop flags (e.g. attitude) also depend on outer loop ignore flags (e.g. position)
@@ -4196,6 +4206,7 @@ void *commander_low_prio_loop(void *arg)
 					int calib_ret = PX4_ERROR;
 
 					/* try to go to INIT/PREFLIGHT arming state */
+					mavlink_log_info(&mavlink_log_pub, "INIT/PREFLIGHT to Arm");
 					if (TRANSITION_DENIED == arming_state_transition(&status,
 											 &battery,
 											 &safety,
@@ -4303,6 +4314,7 @@ void *commander_low_prio_loop(void *arg)
 							!(status.rc_input_mode >= vehicle_status_s::RC_IN_MODE_OFF), arm_requirements & ARM_REQ_GPS_BIT,
 							true, is_vtol(&status), hotplug_timeout, false, hrt_elapsed_time(&commander_boot_timestamp));
 
+							mavlink_log_info(&mavlink_log_pub, "preflightCheck");
 						arming_state_transition(&status,
 									&battery,
 									&safety,
