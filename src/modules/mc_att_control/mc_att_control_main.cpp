@@ -64,6 +64,7 @@
 #include <px4_tasks.h>
 #include <systemlib/circuit_breaker.h>
 #include <systemlib/err.h>
+#include <systemlib/mavlink_log.h>
 #include <systemlib/mixer/mixer.h>
 #include <systemlib/param/param.h>
 #include <systemlib/perf_counter.h>
@@ -126,6 +127,7 @@ private:
 
 	bool	_task_should_exit;		/**< if true, task_main() should exit */
 	int		_control_task;			/**< task handle */
+	orb_advert_t	_mavlink_log_pub;		/**< mavlink log advert */
 
 	int		_v_att_sub;		/**< vehicle attitude subscription */
 	int		_v_att_sp_sub;			/**< vehicle attitude setpoint subscription */
@@ -331,6 +333,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 
 	_task_should_exit(false),
 	_control_task(-1),
+	_mavlink_log_pub(nullptr),
 
 	/* subscriptions */
 	_v_att_sub(-1),
@@ -1112,6 +1115,7 @@ MulticopterAttitudeControl::task_main()
 		}
 
 		perf_begin(_loop_perf);
+		static uint64_t last_time=0;
 
 		/* run controller on gyro changes */
 		if (poll_fds.revents & POLLIN) {
@@ -1233,6 +1237,15 @@ MulticopterAttitudeControl::task_main()
 				_actuators.control[7] = _v_att_sp.landing_gear;
 				_actuators.timestamp = hrt_absolute_time();
 				_actuators.timestamp_sample = _v_att.timestamp;
+
+				float diff = (hrt_absolute_time()-last_time) / 1000000.0f;
+				if(diff > 1.0f){
+					last_time=hrt_absolute_time();
+					mavlink_log_critical(&_mavlink_log_pub, " tx: %3.3f", double(_actuators.control[0]));
+					mavlink_log_critical(&_mavlink_log_pub, " ty: %3.3f", double(_actuators.control[1]));
+					mavlink_log_critical(&_mavlink_log_pub, " tz: %3.3f", double(_actuators.control[2]));
+					mavlink_log_critical(&_mavlink_log_pub, " thrust: %3.3f", double(_actuators.control[3]));
+				}
 
 				/* scale effort by battery status */
 				if (_params.bat_scale_en && _battery_status.scale > 0.0f) {

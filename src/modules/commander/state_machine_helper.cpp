@@ -469,6 +469,12 @@ main_state_transition(struct vehicle_status_s *status, main_state_t new_main_sta
 
 		break;
 
+	/*
+	case commander_state_s::MAIN_STATE_ORIGINAL:
+		ret = TRANSITION_CHANGED;
+		break;
+	*/
+
 	case commander_state_s::MAIN_STATE_MAX:
 	default:
 		break;
@@ -593,7 +599,6 @@ bool set_nav_state(struct vehicle_status_s *status,
 	reset_link_loss_globals(armed, old_failsafe, data_link_loss_act);
 
 	// mavlink_and_console_log_info(mavlink_log_pub, "set nav state");
-	mavlink_and_console_log_info(mavlink_log_pub, "state: %i", internal_state->main_state);
 	/* evaluate main state to decide in normal (non-failsafe) mode */
 	switch (internal_state->main_state) {
 	case commander_state_s::MAIN_STATE_ACRO:
@@ -638,6 +643,12 @@ bool set_nav_state(struct vehicle_status_s *status,
 		}
 
 		break;
+
+	/*
+	case commander_state_s::MAIN_STATE_ORIGINAL:
+		status->nav_state = vehicle_status_s::NAVIGATION_STATE_ORIGINAL;
+		break;
+	*/
 
 	case commander_state_s::MAIN_STATE_POSCTL: {
 
@@ -845,11 +856,10 @@ bool set_nav_state(struct vehicle_status_s *status,
 
 	case commander_state_s::MAIN_STATE_OFFBOARD:
 
-	mavlink_and_console_log_info(mavlink_log_pub, "set_nav_state state: OFFBOARD");
 		/* require offboard control, otherwise stay where you are */
 		if (status_flags->offboard_control_signal_lost && !status->rc_signal_lost) {
 			enable_failsafe(status, old_failsafe, mavlink_log_pub, reason_no_offboard);
-			mavlink_log_info(mavlink_log_pub, "offboard_control_signal_lost");
+			mavlink_log_info(mavlink_log_pub, "sigLost + w/ rc");
 
 			if (status_flags->offboard_control_loss_timeout && offb_loss_rc_act < 6 && offb_loss_rc_act >= 0) {
 				if (offb_loss_rc_act == 3 && status_flags->condition_global_position_valid
@@ -904,6 +914,7 @@ bool set_nav_state(struct vehicle_status_s *status,
 
 		} else if (status_flags->offboard_control_signal_lost && status->rc_signal_lost) {
 			enable_failsafe(status, old_failsafe, mavlink_log_pub, reason_no_rc_and_no_offboard);
+			// mavlink_log_critical(mavlink_log_pub, "sigLost + w/o rc");
 
 			if (status_flags->offboard_control_loss_timeout && offb_loss_act < 3 && offb_loss_act >= 0) {
 				if (offb_loss_act == 2 && status_flags->condition_global_position_valid
@@ -1015,6 +1026,7 @@ bool check_invalid_pos_nav_state(struct vehicle_status_s *status,
 
 		if (using_global_pos) {
 			enable_failsafe(status, old_failsafe, mavlink_log_pub, reason_no_global_position);
+			mavlink_log_info(mavlink_log_pub, "check_invalid_pos_nav_state");
 
 		} else {
 			enable_failsafe(status, old_failsafe, mavlink_log_pub, reason_no_local_position);

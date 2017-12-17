@@ -247,7 +247,7 @@ void tune_failsafe(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_PURPLE, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		mavlink_and_console_log_info(&mavlink_log_pub, "FAILSAFE Buzz: %i", led_control_s::COLOR_PURPLE);
+		// mavlink_and_console_log_info(&mavlink_log_pub, "FAILSAFE Buzz: %i", led_control_s::COLOR_PURPLE);
 		set_tune(TONE_BATTERY_WARNING_FAST_TUNE);
 	}
 }
