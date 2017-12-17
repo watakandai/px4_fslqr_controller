@@ -1941,7 +1941,7 @@ int commander_thread_main(int argc, char *argv[])
 					/* wait for timeout if set */
 					status_flags.offboard_control_loss_timeout = offboard_control_mode.timestamp +
 						OFFBOARD_TIMEOUT + offboard_loss_timeout * 1e6f < hrt_absolute_time();
-						mavlink_and_console_log_info(&mavlink_log_pub, "Offboard Wait4Timeout");
+						// mavlink_and_console_log_info(&mavlink_log_pub, "Offboard Wait4Timeout");
 				}
 
 				if (status_flags.offboard_control_loss_timeout) {
@@ -3112,6 +3112,18 @@ int commander_thread_main(int argc, char *argv[])
 			orb_publish(ORB_ID(actuator_armed), armed_pub, &armed);
 		}
 
+		/*
+		mavlink_log_critical(&mavlink_log_pub, "offboard %i", control_mode.flag_control_offboard_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "rates %i", control_mode.flag_control_rates_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "att %i", control_mode.flag_control_attitude_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "ratt %i", control_mode.flag_control_rattitude_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "acce %i", control_mode.flag_control_acceleration_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "vel %i", control_mode.flag_control_velocity_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "climb %i", control_mode.flag_control_climb_rate_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "pos %i", control_mode.flag_control_position_enabled);
+		mavlink_log_critical(&mavlink_log_pub, "alt %i", control_mode.flag_control_altitude_enabled);
+		*/
+
 		/* play arming and battery warning tunes */
 		if (!arm_tune_played && armed.armed && (!safety.safety_switch_available || (safety.safety_switch_available
 							&& safety.safety_off))) {
@@ -3999,8 +4011,7 @@ set_control_mode()
 		control_mode.flag_control_manual_enabled = false;
 		control_mode.flag_control_auto_enabled = false;
 		control_mode.flag_control_offboard_enabled = true;
-		mavlink_and_console_log_info(&mavlink_log_pub, "set_control_mode");
-		mavlink_and_console_log_info(&mavlink_log_pub, "ignore_position %i", offboard_control_mode.ignore_position);
+
 		/*
 		 * The control flags depend on what is ignored according to the offboard control mode topic
 		 * Inner loop flags (e.g. attitude) also depend on outer loop ignore flags (e.g. position)
