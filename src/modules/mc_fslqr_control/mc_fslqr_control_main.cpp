@@ -5,6 +5,7 @@
  * @author Kandai Watanabe <github account: kandai-wata>
  */
 
+#include <iostream>
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_tasks.h>
@@ -36,6 +37,7 @@
 #include <lib/mixer/mixer.h>
 // #include <lib/eigen/Eigen/Core>
 #include <px4_eigen.h>
+#include <vector>
 #include <mathlib/mathlib.h>
 #include <systemlib/circuit_breaker.h>
 #include <systemlib/err.h>
@@ -52,7 +54,8 @@
 #define I_Y 0.0458929
 #define I_Z 0.0977
 #define MAX_VEL 1100
-#define MOTOR_CONST = 0.00000
+#define MOTOR_CONST  0.00000
+#define MASS 1.5
 
 /**
  * Multicopter position control app start / stop handling function
@@ -157,14 +160,31 @@ private:
 
 	math::Vector<3> _pos;
 	math::Vector<3> _pos_sp;
-	math::Matrix<3, 3> _R;			/**< rotation matrix from attitude quaternions */
+	math::Matrix<3, 3> _Rot;			/**< rotation matrix from attitude quaternions */
 	matrix::Dcmf _R_setpoint;
 	math::Matrix<3, 3>	_board_rotation = {};	/**< rotation matrix for the orientation that the board is mounted */
+	/*
 	math::Matrix<n_u, n_x> K;
-  math::Vector<n_u> U0;
+	math::Matrix<n_x, n_x> A;
+	math::Matrix<n_x, n_u> B;
+	math::Matrix<n_x, n_x> Q;
+	math::Matrix<n_u, n_u> R;
+	*/
+	math::Matrix<n_u, n_x> _K;
+	Eigen::MatrixXd _Keigen;
+	Eigen::MatrixXd _A;
+	Eigen::MatrixXd _B;
+	Eigen::MatrixXd _Q;
+	Eigen::MatrixXd _R;
+  math::Vector<n_u> _U0;
 
-
-
+	void initAB();
+	void setQR();
+	void calcGainK();
+	Eigen::MatrixXd care(const Eigen::MatrixXd A,
+												const Eigen::MatrixXd B,
+												const Eigen::MatrixXd Q,
+												const Eigen::MatrixXd R);
 	/**
 	 * Update our local parameter cache.
 	 */
@@ -271,7 +291,7 @@ MulticopterFSLQRControl::MulticopterFSLQRControl() :
 
 	_pos.zero();
 	_pos_sp.zero();
-	_R.identity();
+	_Rot.identity();
 	_R_setpoint.identity();
 	_board_rotation.identity();
 	_actuators_id = ORB_ID(actuator_controls_0);
@@ -282,78 +302,135 @@ MulticopterFSLQRControl::MulticopterFSLQRControl() :
 	_params_handles.board_offset[1]		=	param_find("SENS_BOARD_Y_OFF");
 	_params_handles.board_offset[2]		=	param_find("SENS_BOARD_Z_OFF");
 
+	// A.zero();
+	// B.zero();
+	// Q.zero();
+	// R.zero();
+	_K.zero();
+	initAB();
+	setQR();
+	calcGainK();
 	/*
-	K(Utx, Xx) = -9.5560*10^(-16);
-	K(Utx, Xy) = -9.5110*10^(-16);
-	K(Utx, Xz) = 3.0984;
-	K(Utx, Xu) = 1.5537*10^(-17);
-	K(Utx, Xv) = -1.0964*10^(-16);
-	K(Utx, Xw) = 4.2999;
-	K(Utx, Xphi) = 9.6986*10^(-16);
-	K(Utx, Xtheta) = -1.0722*10^(-15);
-	K(Utx, Xpsi) = -1.7784*10^(-16);
-	K(Utx, Xp) = -7.2540*10^(-18);
-	K(Utx, Xq) = -8.5048*10^(-18);
-	K(Utx, Xr) = -1.821*10^(-17);
+	_K(Uf, Xz) = 3.0984;
+	_K(Uf, Xw) = 4.2999;
 
-	K(Uty, Xx) = 1.8619*10^(-14);
-	K(Uty, Xy) = -2.9828;
-	K(Uty, Xz) = 2.4418*10^(-16);
-	K(Uty, Xu) = 3.1208*10^(-15);
-	K(Uty, Xv) = -3.9486;
-	K(Uty, Xw) = -4.5379*10^(-16);
-	K(Uty, Xphi) = -9.5939;
-	K(Uty, Xtheta) = 1.2636*10^(-15);
-	K(Uty, Xpsi) = -5.0583*10^(-15);
-	K(Uty, Xp) = -1.1917;
-	K(Uty, Xq) = -2.6702*10^(-17);
-	K(Uty, Xr) = -3.0129*10^(-16);
+	_K(Utx, Xy) = -2.9812;
+	_K(Utx, Xv) = -3.9434;
+	_K(Utx, Xphi) = -9.5264;
+	_K(Utx, Xp) = -1.1752;
 
-	K(Utz, Xx) = 2.9725;
-	K(Utz, Xy) = -8.7596*10^(-15);
-	K(Utz, Xz) = -5.5850*10^(-16);
-	K(Utz, Xu) = 3.9179*10^(-15);
-	K(Utz, Xv) = 3.9486;
-	K(Utz, Xw) = -1.069*10^(-15);
-	K(Utz, Xphi) = 2.7745*10^(-15);
-	K(Utz, Xtheta) = -9.1972;
-	K(Utz, Xpsi) = 2.0776*10^(-15);
-	K(Utz, Xp) = -5.3649*10^(-17);
-	K(Utz, Xq) = -1.0957;
-	K(Utz, Xr) = 5.9262*10^(-18);
+	_K(Uty, Xx) = 2.9811;
+	_K(Uty, Xu) = 3.9434;
+	_K(Uty, Xtheta) = -9.5264;
+	_K(Uty, Xq) = -1.1752;
 
-	K(Uf, Xx) = 9.9189*10^(-15);
-	K(Uf, Xy) = -1.7924*10^(-14);
-	K(Uf, Xz) = 1.9088*10^(-15);
-	K(Uf, Xu) = -8.5873*10^(-16);
-	K(Uf, Xv) = -5.3144*10^(-15);
-	K(Uf, Xw) = 8.3818*10^(-16);
-	K(Uf, Xphi) = -1.2725*10^(-14);
-	K(Uf, Xtheta) = -5.4829*10^(-16);
-	K(Uf, Xpsi) = -1.7621;
-	K(Uf, Xp) = -2.1563*10^(-16);
-	K(Uf, Xq) = 2.111*10^(-18);
-	K(Uf, Xr) = -1.0525;
+	_K(Utz, Xpsi) = -1.7615;
+	_K(Utz, Xr) = -1.0515;
 	*/
-	K.zero();
-	K(Uf, Xz) = 3.0984;
-	K(Uf, Xw) = 4.2999;
 
-	K(Utx, Xy) = -2.9812;
-	K(Utx, Xv) = -3.9434;
-	K(Utx, Xphi) = -9.5264;
-	K(Utx, Xp) = -1.1752;
+  _U0.zero();
+	float C = 1.3;
+  _U0(Uf) = CONSTANTS_ONE_G*C;
+}
 
-	K(Uty, Xx) = 2.9811;
-	K(Uty, Xu) = 3.9434;
-	K(Uty, Xtheta) = -9.5264;
-	K(Uty, Xq) = -1.1752;
+void
+MulticopterFSLQRControl::initAB()
+{
+	_A = Eigen::MatrixXd::Zero(n_x, n_x);
+	_B = Eigen::MatrixXd::Zero(n_x, n_u);
 
-	K(Utz, Xpsi) = -1.7615;
-	K(Utz, Xr) = -1.0515;
+	_A(Xx, Xu) = 1;
+	_A(Xy, Xv) = 1;
+	_A(Xz, Xw) = 1;
+	_A(Xu, Xtheta) = -CONSTANTS_ONE_G;
+	_A(Xv, Xphi) = CONSTANTS_ONE_G;
+	_A(Xphi, Xp) = 1;
+	_A(Xtheta, Xq) = 1;
+	_A(Xpsi, Xr) = 1;
 
-  U0.zero();
-  U0(Uf) = 9.81*1.30;
+	_B(Xw, Uf) = -1/MASS;
+	_B(Xp, Utx) = 1/I_X;
+	_B(Xq, Uty) = 1/I_Y;
+	_B(Xr, Utz) = 1/I_Z;
+	/*
+	std::cout << "_A" << std::endl;
+	std::cout << _A << std::endl;
+	std::cout << "_B" << std::endl;
+	std::cout << _B << std::endl;
+	*/
+}
+
+void
+MulticopterFSLQRControl::setQR()
+{
+	_Q = Eigen::MatrixXd::Identity(n_x, n_x);
+	_R = Eigen::MatrixXd::Identity(n_u, n_u);
+
+	_Q(Xx, Xx) = 10;
+	_Q(Xy, Xy) = 10;
+	_Q(Xz, Xz) = 10;
+	/*
+	std::cout << "_Q" << std::endl;
+	std::cout << _Q << std::endl;
+	std::cout << "_R" << std::endl;
+	std::cout << _R << std::endl;
+	*/
+}
+
+
+void
+MulticopterFSLQRControl::calcGainK()
+{
+	/**
+	* Calculate LQR Gain K
+	* Solves Riccati Equation using Arimoto Potter Method
+	*/
+	Eigen::MatrixXd  P = care(_A, _B, _Q, _R);
+	_Keigen = _R.inverse() * _B.transpose() * P;
+
+	for(int i(0); i<n_u; i++){
+		for(int j(0); j<n_x; j++){
+			_K(i,j) = float(_Keigen(i,j));
+		}
+	}
+}
+
+Eigen::MatrixXd
+MulticopterFSLQRControl::care(const Eigen::MatrixXd A,
+	 														const Eigen::MatrixXd B,
+															const Eigen::MatrixXd Q,
+															const Eigen::MatrixXd R)
+{
+		// Continuous Algebraic Riccati Equation Solver
+		// http://www.humachine.fr.dendai.ac.jp/lec/SDRE_%E3%83%86%E3%82%AF%E3%83%8E%E3%82%BB%E3%83%B3%E3%82%BF%E8%AC%9B%E6%BC%9405.pdf
+    int n = (int)A.rows();
+		// Hamilton Matrix
+    Eigen::MatrixXd Ham(2*n, 2*n);
+    Ham << A, -B*R.inverse()*B.transpose(), -Q, -A.transpose();
+
+    // EigenVec, Value
+    Eigen::EigenSolver<Eigen::MatrixXd> Eigs(Ham);
+    if (Eigs.info() != Eigen::Success) abort();
+
+		Eigen::MatrixXcd eigvec(2*n, n);
+    int j = 0;
+
+    for(int i = 0; i < 2*n; ++i){
+        if(Eigs.eigenvalues()[i].real() < 0){
+            eigvec.col(j) = Eigs.eigenvectors().block(0, i, 2*n, 1);
+            ++j;
+        }
+    }
+
+		Eigen::MatrixXcd U(n, n);
+		Eigen::MatrixXcd V(n, n);
+
+		U = eigvec.block(0,0,n,n);
+    V = eigvec.block(n,0,n,n);
+    Eigen::MatrixXd  P = (V * U.inverse()).real();
+
+    //解Pを求める
+    return P;
 }
 
 MulticopterFSLQRControl::~MulticopterFSLQRControl()
@@ -446,9 +523,9 @@ MulticopterFSLQRControl::poll_subscriptions()
 
 		/* get current rotation matrix and euler angles from control state quaternions */
 		math::Quaternion q_att(_att.q[0], _att.q[1], _att.q[2], _att.q[3]);
-		_R = q_att.to_dcm();
+		_Rot = q_att.to_dcm();
 		math::Vector<3> euler_angles;
-		euler_angles = _R.to_euler();
+		euler_angles = _Rot.to_euler();
 		_yaw = euler_angles(2);
 	}
 
@@ -582,12 +659,16 @@ MulticopterFSLQRControl::update_ref()
 void
 MulticopterFSLQRControl::do_control()
 {
+	// if(_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid)
+	// flag_control_velocity_enabled && velocity_valid
+	// if(_control_mode.flag_control_altitude_enabled && _pos_sp_triplet.current.alt_valid)
+	// else if (_control_mode.flag_control_climb_rate_enabled && _pos_sp_triplet.current.velocity_valid)
 	math::Vector<n_x> X;
-	X(Xx) = _local_pos.x - _pos_sp(Xx);
-	X(Xy) = _local_pos.y - _pos_sp(Xy);
-	X(Xz) = _local_pos.z - _pos_sp(Xz);
-	X(Xu) = _local_pos.vx;
-	X(Xv) = _local_pos.vy;
+	X(Xx) = _local_pos.y - _pos_sp_triplet.current.y;
+	X(Xy) = _local_pos.x - _pos_sp_triplet.current.x;
+	X(Xz) = _local_pos.z - _pos_sp_triplet.current.z;
+	X(Xu) = _local_pos.vy;
+	X(Xv) = _local_pos.vx;
 	X(Xw) = _local_pos.vz;
 
 	/* get current rotation matrix from control state quaternions */
@@ -625,13 +706,24 @@ MulticopterFSLQRControl::do_control()
 	X(Xphi) = eul(0);
 	X(Xtheta) = eul(1);
 	X(Xpsi) = eul(2);
+	// X(Xpsi) = eul(2) - _pos_sp_triplet.current.yaw;
 	X(Xp) = rates(0);
 	X(Xq) = rates(1);
 	X(Xr) = rates(2);
 	math::Vector<n_u> U;
-	U = U0 + K*X;
-	U(Uf) = U(Uf)/(2*U0(Uf));
-
+	U = _U0 - _K*X;
+	U(Uf) = U(Uf)/(2*_U0(Uf));
+	/*
+	std::cout << "Uf: " << (_K*X)(Uf) << std::endl;
+	std::cout << "Utx: " <<(_K*X)(Utx) << std::endl;
+	std::cout << "Uty: " <<(_K*X)(Uty) << std::endl;
+	std::cout << "Utz: " <<(_K*X)(Utz) << std::endl;
+	std::cout << "U: " << U(Uf) << std::endl;
+	*/
+	/*
+	std::cout << "_K" << std::endl;
+	std::cout << _K << std::endl;
+	*/
 	_actuators.control[0] = U(Utx);
 	_actuators.control[1] = U(Uty);
 	_actuators.control[2] = U(Utz);
@@ -640,27 +732,22 @@ MulticopterFSLQRControl::do_control()
 
   float diff = (hrt_absolute_time()-_last_time) / 1000000.0f;
   if(diff > 1.0f){
-		mavlink_log_critical(&_mavlink_log_pub, "x_sp: %3.3f", double(_pos_sp(Xx)));
-		mavlink_log_critical(&_mavlink_log_pub, "y_sp: %3.3f", double(_pos_sp(Xy)));
-		mavlink_log_critical(&_mavlink_log_pub, "z_sp: %3.3f", double(_pos_sp(Xz)));
-		mavlink_log_critical(&_mavlink_log_pub, "x: %3.3f", double(X(Xx)));
-		mavlink_log_critical(&_mavlink_log_pub, "y: %3.3f", double(X(Xy)));
-		mavlink_log_critical(&_mavlink_log_pub, "z: %3.3f", double(X(Xz)));
-		mavlink_log_critical(&_mavlink_log_pub, "phi: %3.3f", double(X(Xphi)));
-		mavlink_log_critical(&_mavlink_log_pub, "theta: %3.3f", double((Xtheta)));
-		mavlink_log_critical(&_mavlink_log_pub, "psi: %3.3f", double(X(Xpsi)));
-		mavlink_log_critical(&_mavlink_log_pub, "Utx: %3.3f", double(U(Utx)));
-		mavlink_log_critical(&_mavlink_log_pub, "Uty: %3.3f", double(U(Uty)));
-		mavlink_log_critical(&_mavlink_log_pub, "Utz: %3.3f", double(U(Utz)));
-		mavlink_log_critical(&_mavlink_log_pub, "Uf: %3.3f", double(U(Uf)));
-    if(_sign==0){
-      _sign=1;
-      // _actuators.control[3] = 0.65f;
-    }else{
-      _sign=0;
-      // _actuators.control[3] = 0.5f;
-    }
-    _last_time=hrt_absolute_time();
+		/*
+  	mavlink_log_critical(&_mavlink_log_pub, "x_sp: %3.3f", double(_pos_sp_triplet.current.x));
+  	mavlink_log_critical(&_mavlink_log_pub, "y_sp: %3.3f", double(_pos_sp_triplet.current.y));
+  	mavlink_log_critical(&_mavlink_log_pub, "z_sp: %3.3f", double(_pos_sp_triplet.current.z));
+  	mavlink_log_critical(&_mavlink_log_pub, "x: %3.3f", double(_local_pos.x));
+  	mavlink_log_critical(&_mavlink_log_pub, "y: %3.3f", double(_local_pos.y));
+  	mavlink_log_critical(&_mavlink_log_pub, "z: %3.3f", double(_local_pos.z));
+  	mavlink_log_critical(&_mavlink_log_pub, "phi: %3.3f", double(eul(0)));
+  	mavlink_log_critical(&_mavlink_log_pub, "th: %3.3f", double(eul(1)));
+		mavlink_log_critical(&_mavlink_log_pub, "psi: %3.3f", double(eul(2)));
+  	mavlink_log_critical(&_mavlink_log_pub, "Utx: %3.3f", double(U(Utx)));
+  	mavlink_log_critical(&_mavlink_log_pub, "Uty: %3.3f", double(U(Uty)));
+  	mavlink_log_critical(&_mavlink_log_pub, "Utz: %3.3f", double(U(Utz)));
+  	mavlink_log_critical(&_mavlink_log_pub, "Uf: %3.3f", double(U(Uf)));
+		*/
+  	_last_time=hrt_absolute_time();
   }
 }
 

@@ -945,6 +945,7 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 						pos_sp_triplet.current.y = set_position_target_local_ned.y;
 						pos_sp_triplet.current.z = set_position_target_local_ned.z;
 
+
 					} else {
 						pos_sp_triplet.current.position_valid = false;
 					}

@@ -45,6 +45,7 @@
 #pragma GCC diagnostic ignored "-Wfloat-equal"
 #define _GLIBCXX_USE_C99_FP_MACROS_DYNAMIC 1
 
-#include <eigen/Eigen/Core>
-#include <eigen/Eigen/Geometry>
+// #include <eigen/Eigen/Core>
+// #include <eigen/Eigen/Geometry>
+#include <eigen/Eigen/Dense>
 #pragma GCC diagnostic pop

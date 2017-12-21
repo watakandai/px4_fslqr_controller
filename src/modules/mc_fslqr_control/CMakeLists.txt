@@ -34,6 +34,7 @@ px4_add_module(
 	MODULE modules__mc_fslqr_control
 	MAIN mc_fslqr_control
 	COMPILE_FLAGS
+		-Wno-logical-op
 	STACK_MAIN 1200
 	SRCS
 		mc_fslqr_control_main.cpp
