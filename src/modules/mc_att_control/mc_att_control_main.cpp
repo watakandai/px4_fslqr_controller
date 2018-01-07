@@ -53,6 +53,7 @@
  * If rotation matrix setpoint is invalid it will be generated from Euler angles for compatibility with old position controllers.
  */
 
+#include <iostream>
 #include <conversion/rotation.h>
 #include <drivers/drv_hrt.h>
 #include <lib/geo/geo.h>
@@ -821,6 +822,8 @@ MulticopterAttitudeControl::control_attitude(float dt)
 	/* get current rotation matrix from control state quaternions */
 	math::Quaternion q_att(_v_att.q[0], _v_att.q[1], _v_att.q[2], _v_att.q[3]);
 	math::Matrix<3, 3> R = q_att.to_dcm();
+	// math::Vector<3> eul = q_att.to_euler();
+	// std::cout << "eul: " << eul(0) << " " << eul(1) << " " <<  eul(2) << std::endl;
 
 	/* all input data is ready, run controller itself */
 
@@ -994,6 +997,7 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 	rates(0) -= _sensor_bias.gyro_x_bias;
 	rates(1) -= _sensor_bias.gyro_y_bias;
 	rates(2) -= _sensor_bias.gyro_z_bias;
+	// std::cout << "pqr: " << rates(0) << " " << rates(1) << " " <<  rates(2) << std::endl;
 
 	math::Vector<3> rates_p_scaled = _params.rate_p.emult(pid_attenuations(_params.tpa_breakpoint_p, _params.tpa_rate_p));
 	//math::Vector<3> rates_i_scaled = _params.rate_i.emult(pid_attenuations(_params.tpa_breakpoint_i, _params.tpa_rate_i));
@@ -1252,16 +1256,18 @@ MulticopterAttitudeControl::task_main()
 				_controller_status.yaw_rate_integ = _rates_int(2);
 				_controller_status.timestamp = hrt_absolute_time();
 
-				if (!_actuators_0_circuit_breaker_enabled) {
-					if (_actuators_0_pub != nullptr) {
+				if(!_v_control_mode.flag_control_offboard_enabled){
+					if (!_actuators_0_circuit_breaker_enabled) {
+						if (_actuators_0_pub != nullptr) {
 
-						orb_publish(_actuators_id, _actuators_0_pub, &_actuators);
-						perf_end(_controller_latency_perf);
+							orb_publish(_actuators_id, _actuators_0_pub, &_actuators);
+							perf_end(_controller_latency_perf);
 
-					} else if (_actuators_id) {
-						_actuators_0_pub = orb_advertise(_actuators_id, &_actuators);
+						} else if (_actuators_id) {
+							_actuators_0_pub = orb_advertise(_actuators_id, &_actuators);
+						}
+
 					}
-
 				}
 
 				/* publish controller status */

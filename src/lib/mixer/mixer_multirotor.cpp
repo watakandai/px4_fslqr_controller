@@ -50,6 +50,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <math.h>
+#include <iostream>
 
 #include <mathlib/math/Limits.hpp>
 #include <drivers/drv_pwm_output.h>
@@ -308,11 +309,13 @@ MultirotorMixer::mix(float *outputs, unsigned space)
 			this model assumes normalized input / output in the range [0,1] so this is the right place
 			to do it as at this stage the outputs are in that range.
 		 */
+		_thrust_factor = 0;
 		if (_thrust_factor > 0.0f) {
 			outputs[i] = -(1.0f - _thrust_factor) / (2.0f * _thrust_factor) + sqrtf((1.0f - _thrust_factor) *
 					(1.0f - _thrust_factor) / (4.0f * _thrust_factor * _thrust_factor) + (outputs[i] < 0.0f ? 0.0f : outputs[i] /
 							_thrust_factor));
 		}
+		// std::cout << "output" << i << ": " << outputs[i] << std::endl;
 
 		outputs[i] = math::constrain(_idle_speed + (outputs[i] * (1.0f - _idle_speed)), _idle_speed, 1.0f);
 

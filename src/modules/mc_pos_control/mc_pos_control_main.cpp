@@ -49,6 +49,7 @@
  * @author Anton Babushkin <anton.babushkin@me.com>
  */
 
+#include <iostream>
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_tasks.h>
@@ -2325,6 +2326,7 @@ MulticopterPositionControl::update_velocity_derivative()
 
 		_pos(0) = _local_pos.x;
 		_pos(1) = _local_pos.y;
+		// std::cout << "xyz: " << _pos(0) << " " << _pos(1) << " " <<  _pos(2) << std::endl;
 
 		if (_params.alt_mode == 1 && _local_pos.dist_bottom_valid) {
 			_pos(2) = -_local_pos.dist_bottom;
@@ -2340,6 +2342,7 @@ MulticopterPositionControl::update_velocity_derivative()
 
 		_vel(0) = _local_pos.vx;
 		_vel(1) = _local_pos.vy;
+		// std::cout << "uvw: " << _vel(0) << " " << _vel(1) << " " <<  _vel(2) << std::endl;
 
 		if (_params.alt_mode == 1 && _local_pos.dist_bottom_valid) {
 			_vel(2) = -_local_pos.dist_bottom_rate;

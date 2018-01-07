@@ -46,6 +46,7 @@
 #include <conversion/rotation.h>
 #include <mathlib/mathlib.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <iostream>
 
 extern "C" __EXPORT hrt_abstime hrt_reset(void);
 
@@ -79,6 +80,7 @@ static hrt_abstime batt_sim_start = 0;
 
 const unsigned mode_flag_armed = 128; // following MAVLink spec
 const unsigned mode_flag_custom = 1;
+uint64_t last_time=0;
 
 using namespace simulator;
 
@@ -166,7 +168,10 @@ void Simulator::pack_actuator_message(mavlink_hil_actuator_controls_t &msg, unsi
 			}
 		}
 	}
-
+	if(hrt_system_time()-last_time > 1000*1000 ){
+		std::cout << "msg: " << msg.controls[0] << " " << msg.controls[1] << " " << msg.controls[2] << " " << msg.controls[3] << std::endl;
+		last_time = hrt_system_time();
+	}
 	msg.mode = mode_flag_custom;
 	msg.mode |= (armed) ? mode_flag_armed : 0;
 	msg.flags = 0;
